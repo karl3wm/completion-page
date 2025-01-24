@@ -31,7 +31,8 @@
         }
         input[type="text"],
         input[type="password"],
-        textarea {
+        textarea,
+        select {
             width: 100%;
             padding: 8px;
             box-sizing: border-box;
@@ -43,6 +44,7 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-right: 5px;
         }
         button:hover {
             background-color: #0056b3;
@@ -52,36 +54,37 @@
             border: 1px solid #ddd;
             padding: 10px;
             border-radius: 5px;
-            max-height: 300px;
-            overflow-y: auto;
+            min-height: 100px;
         }
-        .message {
-            margin-bottom: 10px;
-        }
-        .user-message {
-            text-align: right;
-            color: #333;
-        }
-        .ai-message {
-            text-align: left;
-            color: #555;
+        .config-container {
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>OpenAI Chat Completion</h1>
-        <div class="form-group">
-            <label for="baseurl">Base URL:</label>
-            <input type="text" id="baseurl" placeholder="https://api.openai.com/v1" required>
+        <div class="config-container">
+            <div class="form-group">
+                <label for="baseurl">Base URL:</label>
+                <input type="text" id="baseurl" placeholder="https://api.openai.com/v1" required>
+            </div>
+            <div class="form-group">
+                <label for="apikey">API Key:</label>
+                <input type="password" id="apikey" placeholder="your-api-key" required>
+            </div>
+            <div class="form-group">
+                <label for="model">Model:</label>
+                <input type="text" id="model" placeholder="gpt-3.5-turbo" required>
+            </div>
+            <button onclick="addConfig()">Add Config</button>
         </div>
         <div class="form-group">
-            <label for="apikey">API Key:</label>
-            <input type="password" id="apikey" placeholder="your-api-key" required>
-        </div>
-        <div class="form-group">
-            <label for="model">Model:</label>
-            <input type="text" id="model" placeholder="gpt-3.5-turbo" required>
+            <label for="configSelect">Select Config:</label>
+            <select id="configSelect" onchange="loadConfig()">
+                <option value="">-- Select Configuration --</option>
+            </select>
+            <button onclick="removeConfig()">Remove Config</button>
         </div>
         <div class="form-group">
             <label for="prompt">Prompt:</label>
@@ -92,6 +95,63 @@
     </div>
 
     <script>
+        let configs = JSON.parse(localStorage.getItem('configs')) || [];
+
+        function saveConfigs() {
+            localStorage.setItem('configs', JSON.stringify(configs));
+        }
+
+        function addConfig() {
+            const baseurl = document.getElementById('baseurl').value;
+            const apikey = document.getElementById('apikey').value;
+            const model = document.getElementById('model').value;
+
+            if (!baseurl || !apikey || !model) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            const config = { baseurl, apikey, model };
+            configs.push(config);
+            saveConfigs();
+            populateConfigSelect();
+            alert('Configuration added successfully!');
+        }
+
+        function populateConfigSelect() {
+            const selectElement = document.getElementById('configSelect');
+            selectElement.innerHTML = '<option value="">-- Select Configuration --</option>';
+            configs.forEach((config, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${config.baseurl} - ${config.model}`;
+                selectElement.appendChild(option);
+            });
+        }
+
+        function loadConfig() {
+            const selectedIndex = document.getElementById('configSelect').value;
+            if (selectedIndex === '') return;
+
+            const config = configs[selectedIndex];
+            document.getElementById('baseurl').value = config.baseurl;
+            document.getElementById('apikey').value = config.apikey;
+            document.getElementById('model').value = config.model;
+        }
+
+        function removeConfig() {
+            const selectedIndex = document.getElementById('configSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a configuration to remove.');
+                return;
+            }
+
+            configs.splice(selectedIndex, 1);
+            saveConfigs();
+            populateConfigSelect();
+            alert('Configuration removed successfully!');
+        }
+
         async function sendMessage() {
             const baseUrl = document.getElementById('baseurl').value;
             const apiKey = document.getElementById('apikey').value;
@@ -104,10 +164,7 @@
             }
 
             const chatContainer = document.getElementById('chat-container');
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'message user-message';
-            userMessageDiv.textContent = `You: ${prompt}`;
-            chatContainer.appendChild(userMessageDiv);
+            chatContainer.textContent = 'Thinking...';
 
             try {
                 const response = await fetch(`${baseUrl}/completions`, {
@@ -130,18 +187,15 @@
                 const data = await response.json();
                 const aiResponse = data.choices[0].text.trim();
 
-                const aiMessageDiv = document.createElement('div');
-                aiMessageDiv.className = 'message ai-message';
-                aiMessageDiv.textContent = `AI: ${aiResponse}`;
-                chatContainer.appendChild(aiMessageDiv);
+                chatContainer.textContent = `AI: ${aiResponse}`;
             } catch (error) {
                 console.error('Error:', error);
-                const errorMessageDiv = document.createElement('div');
-                errorMessageDiv.className = 'message ai-message';
-                errorMessageDiv.textContent = `Error: ${error.message}`;
-                chatContainer.appendChild(errorMessageDiv);
+                chatContainer.textContent = `Error: ${error.message}`;
             }
         }
+
+        // Initialize the config select on page load
+        populateConfigSelect();
     </script>
 </body>
 </html>
