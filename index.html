@@ -55,9 +55,16 @@
             padding: 10px;
             border-radius: 5px;
             min-height: 100px;
+            white-space: pre-wrap;
         }
         .config-container {
             margin-bottom: 20px;
+        }
+        .sequence-container {
+            margin-bottom: 20px;
+        }
+        .sequence-form {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -86,6 +93,44 @@
             </select>
             <button onclick="removeConfig()">Remove Config</button>
         </div>
+        <div class="sequence-container">
+            <h2>Few-Shot Sequence Pairs</h2>
+            <div class="form-group">
+                <label for="prefix">Prefix:</label>
+                <input type="text" id="prefix" placeholder="Prefix" value="### Instruction:\n">
+            </div>
+            <div class="form-group">
+                <label for="infix">Infix:</label>
+                <input type="text" id="infix" placeholder="Infix" value="\n### Response:\n">
+            </div>
+            <div class="form-group">
+                <label for="suffix">Suffix:</label>
+                <input type="text" id="suffix" placeholder="Suffix" value="\n###\n">
+            </div>
+            <div class="sequence-form">
+                <label for="sequenceName">Sequence Name:</label>
+                <input type="text" id="sequenceName" placeholder="Sequence Name" required>
+                <button onclick="addSequence()">Add Sequence</button>
+            </div>
+            <div class="sequence-form">
+                <label for="sequenceSelect">Select Sequence:</label>
+                <select id="sequenceSelect" onchange="loadSequence()">
+                    <option value="">-- Select Sequence --</option>
+                </select>
+                <button onclick="removeSequence()">Remove Sequence</button>
+            </div>
+            <div class="sequence-form">
+                <label for="exampleInput">Example Input:</label>
+                <textarea id="exampleInput" rows="4" placeholder="Example Input" required></textarea>
+                <label for="exampleOutput">Example Output:</label>
+                <textarea id="exampleOutput" rows="4" placeholder="Example Output" required></textarea>
+                <button onclick="addExample()">Add Example</button>
+            </div>
+            <div class="sequence-form">
+                <label for="selectedExamples">Selected Examples:</label>
+                <textarea id="selectedExamples" rows="10" placeholder="Selected Examples" readonly></textarea>
+            </div>
+        </div>
         <div class="form-group">
             <label for="prompt">Prompt:</label>
             <textarea id="prompt" rows="4" placeholder="Type your message here..." required></textarea>
@@ -96,6 +141,7 @@
 
     <script>
         let configs = JSON.parse(localStorage.getItem('configs')) || [];
+        let sequences = JSON.parse(localStorage.getItem('sequences')) || [];
 
         function saveConfigs() {
             localStorage.setItem('configs', JSON.stringify(configs));
@@ -152,19 +198,99 @@
             alert('Configuration removed successfully!');
         }
 
+        function saveSequences() {
+            localStorage.setItem('sequences', JSON.stringify(sequences));
+        }
+
+        function addSequence() {
+            const sequenceName = document.getElementById('sequenceName').value;
+
+            if (!sequenceName) {
+                alert('Please enter a sequence name.');
+                return;
+            }
+
+            const sequence = { name: sequenceName, examples: [] };
+            sequences.push(sequence);
+            saveSequences();
+            populateSequenceSelect();
+            alert('Sequence added successfully!');
+        }
+
+        function populateSequenceSelect() {
+            const selectElement = document.getElementById('sequenceSelect');
+            selectElement.innerHTML = '<option value="">-- Select Sequence --</option>';
+            sequences.forEach((sequence, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = sequence.name;
+                selectElement.appendChild(option);
+            });
+        }
+
+        function loadSequence() {
+            const selectedIndex = document.getElementById('sequenceSelect').value;
+            if (selectedIndex === '') return;
+
+            const sequence = sequences[selectedIndex];
+            document.getElementById('selectedExamples').value = sequence.examples.map(example => 
+                `${document.getElementById('prefix').value}${example.input}${document.getElementById('infix').value}${example.output}${document.getElementById('suffix').value}`).join('\n');
+        }
+
+        function removeSequence() {
+            const selectedIndex = document.getElementById('sequenceSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a sequence to remove.');
+                return;
+            }
+
+            sequences.splice(selectedIndex, 1);
+            saveSequences();
+            populateSequenceSelect();
+            alert('Sequence removed successfully!');
+        }
+
+        function addExample() {
+            const selectedIndex = document.getElementById('sequenceSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a sequence to add an example to.');
+                return;
+            }
+
+            const exampleInput = document.getElementById('exampleInput').value;
+            const exampleOutput = document.getElementById('exampleOutput').value;
+
+            if (!exampleInput || !exampleOutput) {
+                alert('Please fill in both example input and output.');
+                return;
+            }
+
+            const example = { input: exampleInput, output: exampleOutput };
+            sequences[selectedIndex].examples.push(example);
+            saveSequences();
+            loadSequence();
+            alert('Example added successfully!');
+        }
+
         async function sendMessage() {
             const baseUrl = document.getElementById('baseurl').value;
             const apiKey = document.getElementById('apikey').value;
             const model = document.getElementById('model').value;
             const prompt = document.getElementById('prompt').value;
+            const prefix = document.getElementById('prefix').value;
+            const infix = document.getElementById('infix').value;
+            const suffix = document.getElementById('suffix').value;
+            const selectedExamples = document.getElementById('selectedExamples').value;
 
-            if (!baseUrl || !apiKey || !model || !prompt) {
+            if (!baseUrl || !apiKey || !model || !prompt || !prefix || !infix || !suffix) {
                 alert('Please fill in all fields.');
                 return;
             }
 
             const chatContainer = document.getElementById('chat-container');
             chatContainer.textContent = 'Thinking...';
+
+            const fullPrompt = `${selectedExamples}${prefix}${prompt}${infix}`;
 
             try {
                 const response = await fetch(`${baseUrl}/completions`, {
@@ -175,8 +301,9 @@
                     },
                     body: JSON.stringify({
                         model: model,
-                        prompt: prompt,
-                        max_tokens: 150
+                        prompt: fullPrompt,
+                        max_tokens: 150,
+                        stop: [suffix]
                     })
                 });
 
@@ -187,15 +314,16 @@
                 const data = await response.json();
                 const aiResponse = data.choices[0].text.trim();
 
-                chatContainer.textContent = `AI: ${aiResponse}`;
+                chatContainer.textContent = aiResponse;
             } catch (error) {
                 console.error('Error:', error);
                 chatContainer.textContent = `Error: ${error.message}`;
             }
         }
 
-        // Initialize the config select on page load
+        // Initialize the config and sequence selects on page load
         populateConfigSelect();
+        populateSequenceSelect();
     </script>
 </body>
 </html>
