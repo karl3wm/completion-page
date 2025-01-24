@@ -72,6 +72,12 @@
         .toggle-container input[type="radio"] {
             margin-right: 10px;
         }
+        .export-container {
+            margin-bottom: 20px;
+        }
+        .templates-container {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -88,6 +94,7 @@
             </label>
         </div>
         <div class="config-container">
+            <h2>Configuration</h2>
             <div class="form-group">
                 <label for="baseurl">Base URL:</label>
                 <input type="text" id="baseurl" placeholder="https://api.openai.com/v1" required>
@@ -101,16 +108,29 @@
                 <input type="text" id="model" placeholder="gpt-3.5-turbo" required>
             </div>
             <button onclick="addConfig()">Add Config</button>
+            <div class="form-group">
+                <label for="configSelect">Select Config:</label>
+                <select id="configSelect" onchange="loadConfig()">
+                    <option value="">-- Select Configuration --</option>
+                </select>
+                <button onclick="removeConfig()">Remove Config</button>
+            </div>
+            <button onclick="exportConfigs()">Export Configs</button>
         </div>
-        <div class="form-group">
-            <label for="configSelect">Select Config:</label>
-            <select id="configSelect" onchange="loadConfig()">
-                <option value="">-- Select Configuration --</option>
-            </select>
-            <button onclick="removeConfig()">Remove Config</button>
-        </div>
-        <div class="sequence-container" id="sequence-container" style="display: none;">
-            <h2>Few-Shot Sequence Pairs</h2>
+        <div class="templates-container" id="templates-container" style="display: none;">
+            <h2>Templates</h2>
+            <div class="form-group">
+                <label for="templateName">Template Name:</label>
+                <input type="text" id="templateName" placeholder="Template Name" required>
+                <button onclick="addTemplate()">Add Template</button>
+            </div>
+            <div class="form-group">
+                <label for="templateSelect">Select Template:</label>
+                <select id="templateSelect" onchange="loadTemplate()">
+                    <option value="">-- Select Template --</option>
+                </select>
+                <button onclick="removeTemplate()">Remove Template</button>
+            </div>
             <div class="form-group">
                 <label for="prefix">Prefix:</label>
                 <textarea id="prefix" rows="2" placeholder="Prefix" required>### Instruction:\n</textarea>
@@ -123,17 +143,22 @@
                 <label for="suffix">Suffix:</label>
                 <textarea id="suffix" rows="2" placeholder="Suffix" required>\n###\n</textarea>
             </div>
-            <div class="sequence-form">
+            <button onclick="exportTemplates()">Export Templates</button>
+        </div>
+        <div class="sequence-container" id="sequence-container" style="display: none;">
+            <h2>Few-Shot Sequence Pairs</h2>
+            <div class="form-group">
                 <label for="sequenceName">Sequence Name:</label>
                 <input type="text" id="sequenceName" placeholder="Sequence Name" required>
                 <button onclick="addSequence()">Add Sequence</button>
             </div>
-            <div class="sequence-form">
+            <div class="form-group">
                 <label for="sequenceSelect">Select Sequence:</label>
                 <select id="sequenceSelect" onchange="loadSequence()">
                     <option value="">-- Select Sequence --</option>
                 </select>
                 <button onclick="removeSequence()">Remove Sequence</button>
+                <button onclick="reorderExamples()">Reorder Examples</button>
             </div>
             <div class="sequence-form">
                 <label for="exampleInput">Example Input:</label>
@@ -146,6 +171,8 @@
                 <label for="selectedExamples">Selected Examples:</label>
                 <textarea id="selectedExamples" rows="10" placeholder="Selected Examples" readonly></textarea>
             </div>
+            <button onclick="exportCurrentSequence()">Export Current Sequence</button>
+            <button onclick="exportAllSequences()">Export All Sequences</button>
         </div>
         <div class="form-group">
             <label for="prompt">Prompt:</label>
@@ -158,6 +185,7 @@
     <script>
         let configs = JSON.parse(localStorage.getItem('configs')) || [];
         let sequences = JSON.parse(localStorage.getItem('sequences')) || [];
+        let templates = JSON.parse(localStorage.getItem('templates')) || [];
 
         function saveConfigs() {
             localStorage.setItem('configs', JSON.stringify(configs));
@@ -214,6 +242,19 @@
             alert('Configuration removed successfully!');
         }
 
+        function exportConfigs() {
+            const configsJSON = JSON.stringify(configs, null, 2);
+            const blob = new Blob([configsJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'configs.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         function saveSequences() {
             localStorage.setItem('sequences', JSON.stringify(sequences));
         }
@@ -266,6 +307,20 @@
             alert('Sequence removed successfully!');
         }
 
+        function reorderExamples() {
+            const selectedIndex = document.getElementById('sequenceSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a sequence to reorder examples.');
+                return;
+            }
+
+            const sequence = sequences[selectedIndex];
+            sequence.examples.sort(() => Math.random() - 0.5);
+            saveSequences();
+            loadSequence();
+            alert('Examples reordered successfully!');
+        }
+
         function addExample() {
             const selectedIndex = document.getElementById('sequenceSelect').value;
             if (selectedIndex === '') {
@@ -286,6 +341,108 @@
             saveSequences();
             loadSequence();
             alert('Example added successfully!');
+        }
+
+        function exportCurrentSequence() {
+            const selectedIndex = document.getElementById('sequenceSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a sequence to export.');
+                return;
+            }
+
+            const sequence = sequences[selectedIndex];
+            const sequenceJSON = JSON.stringify(sequence, null, 2);
+            const blob = new Blob([sequenceJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${sequence.name}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportAllSequences() {
+            const sequencesJSON = JSON.stringify(sequences, null, 2);
+            const blob = new Blob([sequencesJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'all_sequences.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function saveTemplates() {
+            localStorage.setItem('templates', JSON.stringify(templates));
+        }
+
+        function addTemplate() {
+            const templateName = document.getElementById('templateName').value;
+            const prefix = document.getElementById('prefix').value;
+            const infix = document.getElementById('infix').value;
+            const suffix = document.getElementById('suffix').value;
+
+            if (!templateName || !prefix || !infix || !suffix) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            const template = { name: templateName, prefix, infix, suffix };
+            templates.push(template);
+            saveTemplates();
+            populateTemplateSelect();
+            alert('Template added successfully!');
+        }
+
+        function populateTemplateSelect() {
+            const selectElement = document.getElementById('templateSelect');
+            selectElement.innerHTML = '<option value="">-- Select Template --</option>';
+            templates.forEach((template, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = template.name;
+                selectElement.appendChild(option);
+            });
+        }
+
+        function loadTemplate() {
+            const selectedIndex = document.getElementById('templateSelect').value;
+            if (selectedIndex === '') return;
+
+            const template = templates[selectedIndex];
+            document.getElementById('prefix').value = template.prefix;
+            document.getElementById('infix').value = template.infix;
+            document.getElementById('suffix').value = template.suffix;
+        }
+
+        function removeTemplate() {
+            const selectedIndex = document.getElementById('templateSelect').value;
+            if (selectedIndex === '') {
+                alert('Please select a template to remove.');
+                return;
+            }
+
+            templates.splice(selectedIndex, 1);
+            saveTemplates();
+            populateTemplateSelect();
+            alert('Template removed successfully!');
+        }
+
+        function exportTemplates() {
+            const templatesJSON = JSON.stringify(templates, null, 2);
+            const blob = new Blob([templatesJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'templates.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function interpretEscapes(text) {
@@ -354,15 +511,17 @@
             }
         }
 
-        // Initialize the config and sequence selects on page load
+        // Initialize the config, sequence, and template selects on page load
         populateConfigSelect();
         populateSequenceSelect();
+        populateTemplateSelect();
 
-        // Toggle sequence container based on prompt type
+        // Toggle sequence and template containers based on prompt type
         document.querySelectorAll('input[name="promptType"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 const promptType = document.querySelector('input[name="promptType"]:checked').value;
                 document.getElementById('sequence-container').style.display = promptType === 'few-shot' ? 'block' : 'none';
+                document.getElementById('templates-container').style.display = promptType === 'few-shot' ? 'block' : 'none';
             });
         });
     </script>
