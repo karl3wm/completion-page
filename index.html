@@ -66,11 +66,27 @@
         .sequence-form {
             margin-bottom: 10px;
         }
+        .toggle-container {
+            margin-bottom: 20px;
+        }
+        .toggle-container input[type="radio"] {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>OpenAI Chat Completion</h1>
+        <div class="toggle-container">
+            <label>
+                <input type="radio" name="promptType" value="normal" checked>
+                Normal Prompt
+            </label>
+            <label>
+                <input type="radio" name="promptType" value="few-shot">
+                Few-Shot Prompt
+            </label>
+        </div>
         <div class="config-container">
             <div class="form-group">
                 <label for="baseurl">Base URL:</label>
@@ -93,19 +109,19 @@
             </select>
             <button onclick="removeConfig()">Remove Config</button>
         </div>
-        <div class="sequence-container">
+        <div class="sequence-container" id="sequence-container" style="display: none;">
             <h2>Few-Shot Sequence Pairs</h2>
             <div class="form-group">
                 <label for="prefix">Prefix:</label>
-                <input type="text" id="prefix" placeholder="Prefix" value="### Instruction:\n">
+                <textarea id="prefix" rows="2" placeholder="Prefix" required>### Instruction:\n</textarea>
             </div>
             <div class="form-group">
                 <label for="infix">Infix:</label>
-                <input type="text" id="infix" placeholder="Infix" value="\n### Response:\n">
+                <textarea id="infix" rows="2" placeholder="Infix" required>\n### Response:\n</textarea>
             </div>
             <div class="form-group">
                 <label for="suffix">Suffix:</label>
-                <input type="text" id="suffix" placeholder="Suffix" value="\n###\n">
+                <textarea id="suffix" rows="2" placeholder="Suffix" required>\n###\n</textarea>
             </div>
             <div class="sequence-form">
                 <label for="sequenceName">Sequence Name:</label>
@@ -234,7 +250,7 @@
 
             const sequence = sequences[selectedIndex];
             document.getElementById('selectedExamples').value = sequence.examples.map(example => 
-                `${document.getElementById('prefix').value}${example.input}${document.getElementById('infix').value}${example.output}${document.getElementById('suffix').value}`).join('\n');
+                `${interpretEscapes(document.getElementById('prefix').value)}${example.input}${interpretEscapes(document.getElementById('infix').value)}${example.output}${interpretEscapes(document.getElementById('suffix').value)}`).join('\n');
         }
 
         function removeSequence() {
@@ -272,17 +288,18 @@
             alert('Example added successfully!');
         }
 
+        function interpretEscapes(text) {
+            return text.replace(/\\n/g, '\n');
+        }
+
         async function sendMessage() {
             const baseUrl = document.getElementById('baseurl').value;
             const apiKey = document.getElementById('apikey').value;
             const model = document.getElementById('model').value;
             const prompt = document.getElementById('prompt').value;
-            const prefix = document.getElementById('prefix').value;
-            const infix = document.getElementById('infix').value;
-            const suffix = document.getElementById('suffix').value;
-            const selectedExamples = document.getElementById('selectedExamples').value;
+            const promptType = document.querySelector('input[name="promptType"]:checked').value;
 
-            if (!baseUrl || !apiKey || !model || !prompt || !prefix || !infix || !suffix) {
+            if (!baseUrl || !apiKey || !model || !prompt) {
                 alert('Please fill in all fields.');
                 return;
             }
@@ -290,7 +307,23 @@
             const chatContainer = document.getElementById('chat-container');
             chatContainer.textContent = 'Thinking...';
 
-            const fullPrompt = `${selectedExamples}${prefix}${prompt}${infix}`;
+            let fullPrompt;
+
+            if (promptType === 'few-shot') {
+                const prefix = interpretEscapes(document.getElementById('prefix').value);
+                const infix = interpretEscapes(document.getElementById('infix').value);
+                const suffix = interpretEscapes(document.getElementById('suffix').value);
+                const selectedExamples = document.getElementById('selectedExamples').value;
+
+                if (!prefix || !infix || !suffix) {
+                    alert('Please fill in prefix, infix, and suffix.');
+                    return;
+                }
+
+                fullPrompt = `${selectedExamples}${prefix}${prompt}${infix}`;
+            } else {
+                fullPrompt = prompt;
+            }
 
             try {
                 const response = await fetch(`${baseUrl}/completions`, {
@@ -303,7 +336,7 @@
                         model: model,
                         prompt: fullPrompt,
                         max_tokens: 150,
-                        stop: [suffix]
+                        stop: promptType === 'few-shot' ? [interpretEscapes(document.getElementById('suffix').value)] : undefined
                     })
                 });
 
@@ -324,6 +357,14 @@
         // Initialize the config and sequence selects on page load
         populateConfigSelect();
         populateSequenceSelect();
+
+        // Toggle sequence container based on prompt type
+        document.querySelectorAll('input[name="promptType"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const promptType = document.querySelector('input[name="promptType"]:checked').value;
+                document.getElementById('sequence-container').style.display = promptType === 'few-shot' ? 'block' : 'none';
+            });
+        });
     </script>
 </body>
 </html>
