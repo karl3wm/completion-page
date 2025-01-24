@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI Chat Completion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .chat-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 10px;
+        }
+        .user-message {
+            text-align: right;
+            color: #333;
+        }
+        .ai-message {
+            text-align: left;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OpenAI Chat Completion</h1>
+        <div class="form-group">
+            <label for="baseurl">Base URL:</label>
+            <input type="text" id="baseurl" placeholder="https://api.openai.com/v1" required>
+        </div>
+        <div class="form-group">
+            <label for="apikey">API Key:</label>
+            <input type="password" id="apikey" placeholder="your-api-key" required>
+        </div>
+        <div class="form-group">
+            <label for="model">Model:</label>
+            <input type="text" id="model" placeholder="gpt-3.5-turbo" required>
+        </div>
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" rows="4" placeholder="Type your message here..." required></textarea>
+        </div>
+        <button onclick="sendMessage()">Send</button>
+        <div class="chat-container" id="chat-container"></div>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const baseUrl = document.getElementById('baseurl').value;
+            const apiKey = document.getElementById('apikey').value;
+            const model = document.getElementById('model').value;
+            const prompt = document.getElementById('prompt').value;
+
+            if (!baseUrl || !apiKey || !model || !prompt) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            const chatContainer = document.getElementById('chat-container');
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.textContent = `You: ${prompt}`;
+            chatContainer.appendChild(userMessageDiv);
+
+            try {
+                const response = await fetch(`${baseUrl}/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        prompt: prompt,
+                        max_tokens: 150
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiResponse = data.choices[0].text.trim();
+
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'message ai-message';
+                aiMessageDiv.textContent = `AI: ${aiResponse}`;
+                chatContainer.appendChild(aiMessageDiv);
+            } catch (error) {
+                console.error('Error:', error);
+                const errorMessageDiv = document.createElement('div');
+                errorMessageDiv.className = 'message ai-message';
+                errorMessageDiv.textContent = `Error: ${error.message}`;
+                chatContainer.appendChild(errorMessageDiv);
+            }
+        }
+    </script>
+</body>
+</html>
